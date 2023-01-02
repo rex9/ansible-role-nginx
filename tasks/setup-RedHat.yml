@@ -1,12 +1,26 @@
 ---
-- name: Enable nginx repo.
-  template:
-    src: nginx.repo.j2
-    dest: /etc/yum.repos.d/nginx.repo
-    owner: root
-    group: "{{ root_group }}"
+- name: Add nginx yum repository
+  yum_repository:
+    name: nginx
+    description: Nginx Yum Repository
+    file: nginx
+    baseurl: "https://nginx.org/packages/centos/{{ ansible_distribution_major_version }}/$basearch"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "https://nginx.org/keys/nginx_signing.key"
     mode: 0644
+    module_hotfixes: "{{ omit if ansible_version.full is version('2.11', '<') else true }}"
   when: nginx_yum_repo_enabled | bool
+  register: nginx_package_repo_addition
+  until: nginx_package_repo_addition is succeeded
+  retries: 5
+  delay: 10
+
+- name: Refresh yum metadata cache if repo changed.
+  command: >
+    yum clean metadata
+    warn=no
+  when: nginx_package_repo_addition.changed
 
 - name: Ensure nginx is installed.
   package:
